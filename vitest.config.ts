@@ -8,6 +8,7 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./tests/setup.ts'],
     coverage: { provider: 'v8', reporter: ['text', 'html'] },
+    include: ['tests/unit/**/*.test.{ts,tsx}'],
   },
   resolve: {
     alias: {

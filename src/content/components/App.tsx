@@ -208,6 +208,18 @@ export function App() {
     return () => document.removeEventListener('keydown', onKey);
   }, [maximized, maskOn, settingsOpen]);
 
+  // Listen for background command messages
+  useEffect(() => {
+    const listener = (msg: { type: string; command?: string }) => {
+      if (msg.type !== 'command') return;
+      if (msg.command === 'toggle-maximize') setMaximized((v) => !v);
+      if (msg.command === 'toggle-mask') setMaskOn((v) => !v);
+      if (msg.command === 'pop-out') void handlePopOut();
+    };
+    chrome.runtime.onMessage.addListener(listener);
+    return () => chrome.runtime.onMessage.removeListener(listener);
+  }, [handlePopOut]);
+
   if (!video) return null;
 
   return (

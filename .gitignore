@@ -4,3 +4,8 @@ node_modules/
 dist/
 target/
 *.log
+*.tsbuildinfo
+src/**/*.js
+src/**/*.d.ts
+vite.config.js
+vite.config.d.ts

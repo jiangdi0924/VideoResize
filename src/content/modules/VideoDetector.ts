@@ -4,13 +4,28 @@ export class VideoDetector {
   private target: HTMLVideoElement | null = null;
   private listeners = new Map<'videochange', Set<Listener>>();
   private observer: MutationObserver | null = null;
+  private rescanScheduled = false;
 
   constructor() {
     this.rescan();
-    this.observer = new MutationObserver(() => this.rescan());
+    this.observer = new MutationObserver(() => this.scheduleRescan());
     if (typeof document !== 'undefined') {
       this.observer.observe(document.documentElement, { childList: true, subtree: true });
     }
+  }
+
+  private scheduleRescan(): void {
+    if (this.rescanScheduled) return;
+    this.rescanScheduled = true;
+    if (typeof requestAnimationFrame === 'undefined') {
+      this.rescanScheduled = false;
+      this.rescan();
+      return;
+    }
+    requestAnimationFrame(() => {
+      this.rescanScheduled = false;
+      this.rescan();
+    });
   }
 
   getTargetVideo(): HTMLVideoElement | null {

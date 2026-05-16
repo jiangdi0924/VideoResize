@@ -28,17 +28,28 @@ export function App() {
 
   const ctrlRef = useRef<VideoController | null>(null);
   const maxEngineRef = useRef<MaximizeEngine | null>(null);
+  // 当任一功能激活时锁定 target video，阻止 Bilibili / YouTube 这类
+  // 重建 <video> 节点的站点造成 target 抖动 → maximize 循环 → 闪动
+  const lockTargetRef = useRef(false);
 
   const store = useMemo(() => createSettingsStore(), []);
 
   // 视频识别
   useEffect(() => {
     const detector = new VideoDetector();
-    const update = () => setVideo(detector.getTargetVideo());
+    const update = () => {
+      if (lockTargetRef.current) return;
+      setVideo(detector.getTargetVideo());
+    };
     update();
     detector.on('videochange', update);
     return () => detector.destroy();
   }, []);
+
+  // 同步 lockTargetRef
+  useEffect(() => {
+    lockTargetRef.current = maximized || maskOn || aspectRatio !== 'original';
+  }, [maximized, maskOn, aspectRatio]);
 
   // 维护 ctrl / engine 实例（singleton per video）
   useEffect(() => {
@@ -105,11 +116,20 @@ export function App() {
         target: aspectRatio,
         mode: fitMode,
       });
-      ctrl.applyTransform({
-        scaleX: out.transform.scaleX,
-        scaleY: out.transform.scaleY,
-        objectFit: out.objectFit,
-      });
+      // 当目标比例==源比例 且 stretch 模式时，AspectEngine 给出 scaleX=scaleY=1
+      // 直接 apply 会写一次 transform: scale(1,1) !important，触发站点 player 的
+      // ResizeObserver / MutationObserver → 闪动。完全 no-op 时跳过写入。
+      const isNoOp =
+        out.transform.scaleX === 1 &&
+        out.transform.scaleY === 1 &&
+        out.objectFit === 'fill';
+      if (!isNoOp || maximized) {
+        ctrl.applyTransform({
+          scaleX: out.transform.scaleX,
+          scaleY: out.transform.scaleY,
+          objectFit: out.objectFit,
+        });
+      }
     }
   }, [video, maximized, aspectRatio, fitMode]);
 

@@ -3,7 +3,7 @@ import { defineManifest } from '@crxjs/vite-plugin';
 export default defineManifest({
   manifest_version: 3,
   name: 'VideoResize',
-  version: '0.1.0',
+  version: '0.1.1',
   description: '自由调整任何网页视频的大小、宽高比、位置，弹出到独立窗口。',
   icons: {
     16: 'icons/icon-16.png',

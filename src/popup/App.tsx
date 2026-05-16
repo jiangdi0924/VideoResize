@@ -20,8 +20,9 @@ export function App() {
 
   return (
     <div className="w-80 p-4 bg-background text-foreground space-y-6">
-      <header>
+      <header className="flex items-baseline justify-between">
         <h1 className="text-lg font-semibold">VideoResize</h1>
+        <span className="text-xs text-muted-foreground">v{chrome.runtime.getManifest().version}</span>
       </header>
 
       <section className="space-y-2">

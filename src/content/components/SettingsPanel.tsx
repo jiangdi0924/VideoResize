@@ -10,6 +10,9 @@ interface SettingsPanelProps {
   maskOpacity: number;
   onMaskOpacityChange: (v: number) => void;
   onOpenInWindow: () => void;
+  freeMode: boolean;
+  onFreeModeToggle: (on: boolean) => void;
+  onNativeFullscreen: () => void;
 }
 
 const PRESETS: AspectRatio[] = ['16:9', '4:3', '21:9', '32:9', '1:1', '9:16', 'original'];
@@ -80,6 +83,24 @@ export function SettingsPanel(props: SettingsPanelProps) {
           className="w-full"
           aria-label="Mask opacity"
         />
+      </section>
+
+      <section>
+        <h3 className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Free Mode</h3>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={props.freeMode}
+            onChange={(e) => props.onFreeModeToggle(e.target.checked)}
+          />
+          <span>显示拖动手柄（任意缩放和移动）</span>
+        </label>
+        <button
+          onClick={props.onNativeFullscreen}
+          className="mt-3 w-full px-3 py-2 rounded bg-accent text-foreground text-sm"
+        >
+          进入原生全屏
+        </button>
       </section>
 
       <section>

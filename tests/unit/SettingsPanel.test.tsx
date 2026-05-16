@@ -13,6 +13,9 @@ describe('SettingsPanel', () => {
     maskOpacity: 0.8,
     onMaskOpacityChange: vi.fn(),
     onOpenInWindow: vi.fn(),
+    freeMode: false,
+    onFreeModeToggle: vi.fn(),
+    onNativeFullscreen: vi.fn(),
   };
 
   it('renders 7 aspect ratio preset buttons', () => {

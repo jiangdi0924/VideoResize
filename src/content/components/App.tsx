@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createSettingsStore } from '@shared/store/SettingsStore';
 import { extractDomain } from '@shared/domain';
 import type { AspectRatio, FitMode } from '@shared/types';
@@ -11,6 +11,7 @@ import { PopOutEngine } from '../modules/PopOutEngine';
 import { FloatingToolbar } from './FloatingToolbar';
 import { SettingsPanel } from './SettingsPanel';
 import { Toast } from './Toast';
+import { DragHandles } from './DragHandles';
 
 export function App() {
   const [video, setVideo] = useState<HTMLVideoElement | null>(null);
@@ -21,6 +22,8 @@ export function App() {
   const [fitMode, setFitMode] = useState<FitMode>('letterbox');
   const [maskOpacity, setMaskOpacity] = useState(0.8);
   const [toast, setToast] = useState<string | null>(null);
+  const [freeMode, setFreeMode] = useState(false);
+  const [freeRect, setFreeRect] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
 
   const store = useMemo(() => createSettingsStore(), []);
 
@@ -99,7 +102,17 @@ export function App() {
     );
   }, [maskOn, video, maximized]);
 
-  const handlePopOut = async () => {
+  // Initialize freeRect when maximized or video changes
+  useEffect(() => {
+    if (!video || !maximized) {
+      setFreeRect(null);
+      return;
+    }
+    const rect = video.getBoundingClientRect();
+    setFreeRect({ x: rect.left, y: rect.top, width: rect.width, height: rect.height });
+  }, [video, maximized]);
+
+  const handlePopOut = useCallback(async () => {
     if (!video) return;
     try {
       const engine = new PopOutEngine(video);
@@ -108,9 +121,9 @@ export function App() {
     } catch (e) {
       setToast(`Pop out failed: ${(e as Error).message}`);
     }
-  };
+  }, [video]);
 
-  const handleOpenInWindow = async () => {
+  const handleOpenInWindow = useCallback(async () => {
     if (!video) return;
     try {
       const engine = new PopOutEngine(video);
@@ -119,7 +132,81 @@ export function App() {
     } catch (e) {
       setToast(`Cannot open: ${(e as Error).message}`);
     }
-  };
+  }, [video]);
+
+  const handleDrag = useCallback(
+    (e: { handle: string; dx: number; dy: number; isFirst: boolean; isLast: boolean }) => {
+      if (!video || !freeRect) return;
+      const next = { ...freeRect };
+      switch (e.handle) {
+        case 'move':
+          next.x = freeRect.x + e.dx;
+          next.y = freeRect.y + e.dy;
+          break;
+        case 'r':
+          next.width = Math.max(100, freeRect.width + e.dx);
+          break;
+        case 'l':
+          next.x = freeRect.x + e.dx;
+          next.width = Math.max(100, freeRect.width - e.dx);
+          break;
+        case 'b':
+          next.height = Math.max(60, freeRect.height + e.dy);
+          break;
+        case 't':
+          next.y = freeRect.y + e.dy;
+          next.height = Math.max(60, freeRect.height - e.dy);
+          break;
+        case 'br':
+          next.width = Math.max(100, freeRect.width + e.dx);
+          next.height = Math.max(60, freeRect.height + e.dy);
+          break;
+        case 'bl':
+          next.x = freeRect.x + e.dx;
+          next.width = Math.max(100, freeRect.width - e.dx);
+          next.height = Math.max(60, freeRect.height + e.dy);
+          break;
+        case 'tr':
+          next.y = freeRect.y + e.dy;
+          next.width = Math.max(100, freeRect.width + e.dx);
+          next.height = Math.max(60, freeRect.height - e.dy);
+          break;
+        case 'tl':
+          next.x = freeRect.x + e.dx;
+          next.y = freeRect.y + e.dy;
+          next.width = Math.max(100, freeRect.width - e.dx);
+          next.height = Math.max(60, freeRect.height - e.dy);
+          break;
+      }
+      if (e.isLast) setFreeRect(next);
+      const ctrl = new VideoController(video);
+      ctrl.attach();
+      const engine = new MaximizeEngine(ctrl);
+      engine.setSize(next);
+    },
+    [video, freeRect],
+  );
+
+  const handleNativeFullscreen = useCallback(() => {
+    if (!video) return;
+    if (document.fullscreenElement) {
+      void document.exitFullscreen();
+    } else {
+      void video.requestFullscreen();
+    }
+  }, [video]);
+
+  // Esc key listener to exit maximize/mask/settings
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (maximized) setMaximized(false);
+      else if (maskOn) setMaskOn(false);
+      else if (settingsOpen) setSettingsOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [maximized, maskOn, settingsOpen]);
 
   if (!video) return null;
 
@@ -135,6 +222,9 @@ export function App() {
             zIndex: 2147483646,
           }}
         />
+      )}
+      {freeMode && maximized && freeRect && (
+        <DragHandles rect={freeRect} onDrag={handleDrag} />
       )}
       <FloatingToolbar
         isMaximized={maximized}
@@ -154,6 +244,9 @@ export function App() {
         maskOpacity={maskOpacity}
         onMaskOpacityChange={setMaskOpacity}
         onOpenInWindow={handleOpenInWindow}
+        freeMode={freeMode}
+        onFreeModeToggle={setFreeMode}
+        onNativeFullscreen={handleNativeFullscreen}
       />
       <Toast message={toast} onClose={() => setToast(null)} />
     </>

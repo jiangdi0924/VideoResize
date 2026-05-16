@@ -3,7 +3,6 @@ import tailwindCss from '@/styles/globals.css?inline';
 export interface MountResult {
   host: HTMLDivElement;
   shadowRoot: ShadowRoot;
-  portalContainer: HTMLDivElement;
 }
 
 export function mountShadowRoot(): MountResult {
@@ -23,10 +22,5 @@ export function mountShadowRoot(): MountResult {
   reactMount.style.pointerEvents = 'auto';
   shadowRoot.appendChild(reactMount);
 
-  const portalContainer = document.createElement('div');
-  portalContainer.id = 'portal-container';
-  portalContainer.style.pointerEvents = 'auto';
-  shadowRoot.appendChild(portalContainer);
-
-  return { host, shadowRoot, portalContainer: portalContainer as HTMLDivElement };
+  return { host, shadowRoot };
 }

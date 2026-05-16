@@ -9,7 +9,6 @@ interface DocumentPictureInPicture {
 }
 
 declare global {
-  // eslint-disable-next-line no-var
   var documentPictureInPicture: DocumentPictureInPicture | undefined;
 }
 

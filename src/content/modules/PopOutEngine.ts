@@ -39,11 +39,7 @@ export class PopOutEngine {
   }
 
   async openStandaloneWindow(): Promise<PopOutResult> {
-    const src = this.video.currentSrc;
-    if (!src || src.startsWith('blob:')) {
-      throw new Error('Cannot open standalone window for MSE/blob video sources');
-    }
-    await chrome.runtime.sendMessage({ type: 'open-standalone-window', videoSrc: src });
+    await chrome.runtime.sendMessage({ type: 'move-tab-to-window' });
     return { strategy: 'standalone-window' };
   }
 }

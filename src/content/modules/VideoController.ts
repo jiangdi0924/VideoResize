@@ -48,6 +48,7 @@ export class VideoController {
 
   applyTransform(t: TransformInput): void {
     if (!this.captured) throw new Error('VideoController: applyTransform requires attach() first');
+    const s = this.video.style;
     const transforms: string[] = [];
     if (t.translateX != null || t.translateY != null) {
       transforms.push(`translate(${t.translateX ?? 0}px, ${t.translateY ?? 0}px)`);
@@ -55,14 +56,17 @@ export class VideoController {
     if (t.scaleX != null || t.scaleY != null) {
       transforms.push(`scale(${t.scaleX ?? 1}, ${t.scaleY ?? 1})`);
     }
-    if (transforms.length > 0) this.video.style.transform = transforms.join(' ');
-    if (t.objectFit) this.video.style.objectFit = t.objectFit;
-    if (t.position) this.video.style.position = t.position;
-    if (t.zIndex != null) this.video.style.zIndex = String(t.zIndex);
-    if (t.width) this.video.style.width = t.width;
-    if (t.height) this.video.style.height = t.height;
-    if (t.top) this.video.style.top = t.top;
-    if (t.left) this.video.style.left = t.left;
+    if (transforms.length > 0) s.setProperty('transform', transforms.join(' '), 'important');
+    if (t.objectFit) s.setProperty('object-fit', t.objectFit, 'important');
+    if (t.position) s.setProperty('position', t.position, 'important');
+    if (t.zIndex != null) s.setProperty('z-index', String(t.zIndex), 'important');
+    if (t.width) s.setProperty('width', t.width, 'important');
+    if (t.height) s.setProperty('height', t.height, 'important');
+    if (t.top) s.setProperty('top', t.top, 'important');
+    if (t.left) s.setProperty('left', t.left, 'important');
+    // Also force display/visibility so site CSS can't hide us
+    s.setProperty('max-width', 'none', 'important');
+    s.setProperty('max-height', 'none', 'important');
   }
 
   getElement(): HTMLVideoElement {

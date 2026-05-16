@@ -3,7 +3,7 @@ import type { Settings } from './types';
 export type ContentToBackground =
   | { type: 'request-settings' }
   | { type: 'save-domain-settings'; domain: string; settings: Partial<import('./types').DomainSettings> }
-  | { type: 'open-standalone-window'; videoSrc: string }
+  | { type: 'move-tab-to-window' }
   | { type: 'detected-video'; frameId: number; hasVideo: boolean };
 
 export type BackgroundToContent =

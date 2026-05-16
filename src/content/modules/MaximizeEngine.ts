@@ -20,6 +20,11 @@ export class MaximizeEngine {
 
   maximize(opts: MaximizeOptions): void {
     if (!this.controller.isAttached()) this.controller.attach();
+    const video = this.controller.getElement();
+    // Always lift to body for predictable position:fixed behavior across sites
+    if (video.parentElement !== document.body) {
+      document.body.appendChild(video);
+    }
     const targetW = window.innerWidth;
     const targetH = window.innerHeight;
     let width = targetW;
@@ -28,7 +33,6 @@ export class MaximizeEngine {
     let y = 0;
 
     if (opts.keepAspect) {
-      const video = this.controller.getElement();
       const sourceRatio = video.videoWidth / video.videoHeight || 16 / 9;
       const targetRatio = targetW / targetH;
       if (sourceRatio > targetRatio) {
@@ -51,10 +55,13 @@ export class MaximizeEngine {
       zIndex: HIGH_Z,
     });
     this.maximized = true;
-    this.verifyFixedWorked(x, y);
   }
 
   setSize(size: Size): void {
+    const video = this.controller.getElement();
+    if (video.parentElement !== document.body) {
+      document.body.appendChild(video);
+    }
     this.controller.applyTransform({
       position: 'fixed',
       top: `${size.y}px`,
@@ -75,14 +82,4 @@ export class MaximizeEngine {
     return this.maximized;
   }
 
-  private verifyFixedWorked(expectedX: number, expectedY: number): void {
-    // 如果祖先元素有 transform，position:fixed 会失效。检测后 lift to body 兜底。
-    const rect = this.controller.getElement().getBoundingClientRect();
-    if (Math.abs(rect.left - expectedX) > 2 || Math.abs(rect.top - expectedY) > 2) {
-      const video = this.controller.getElement();
-      if (video.parentElement !== document.body) {
-        document.body.appendChild(video);
-      }
-    }
-  }
 }

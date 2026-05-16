@@ -41,21 +41,9 @@ describe('PopOutEngine', () => {
     expect(mockPiP).toHaveBeenCalled();
   });
 
-  it('openStandaloneWindow sends message to background', async () => {
-    Object.defineProperty(video, 'currentSrc', { value: 'https://example.com/video.mp4', configurable: true });
+  it('openStandaloneWindow sends move-tab message to background', async () => {
     const engine = new PopOutEngine(video);
-
     await engine.openStandaloneWindow();
-    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
-      type: 'open-standalone-window',
-      videoSrc: 'https://example.com/video.mp4',
-    });
-  });
-
-  it('openStandaloneWindow throws when video src is blob/MSE', async () => {
-    Object.defineProperty(video, 'currentSrc', { value: 'blob:https://example.com/abc', configurable: true });
-    const engine = new PopOutEngine(video);
-
-    await expect(engine.openStandaloneWindow()).rejects.toThrow(/MSE/i);
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({ type: 'move-tab-to-window' });
   });
 });

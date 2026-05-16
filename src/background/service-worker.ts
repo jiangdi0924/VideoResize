@@ -12,17 +12,15 @@ chrome.runtime.onMessage.addListener(
 
 async function handleMessage(
   message: ContentToBackground | PopupToBackground,
-  _sender: chrome.runtime.MessageSender,
+  sender: chrome.runtime.MessageSender,
 ): Promise<unknown> {
   switch (message.type) {
-    case 'open-standalone-window':
-      await chrome.windows.create({
-        url: message.videoSrc,
-        type: 'popup',
-        width: 800,
-        height: 450,
-      });
+    case 'move-tab-to-window': {
+      const tabId = sender.tab?.id;
+      if (tabId == null) throw new Error('No tab ID in sender');
+      await chrome.windows.create({ tabId, type: 'popup' });
       return { ok: true };
+    }
     case 'request-settings':
     case 'get-settings': {
       const stored = await chrome.storage.local.get('settings');

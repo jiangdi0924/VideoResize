@@ -13,7 +13,11 @@ import { SettingsPanel } from './SettingsPanel';
 import { DragHandles } from './DragHandles';
 import { Toast } from './Toast';
 
-export function App() {
+interface AppProps {
+  overlayContainer: HTMLElement;
+}
+
+export function App({ overlayContainer }: AppProps) {
   const [video, setVideo] = useState<HTMLVideoElement | null>(null);
   const [maximized, setMaximized] = useState(false);
   const [maskOn, setMaskOn] = useState(false);
@@ -24,12 +28,10 @@ export function App() {
   const [toast, setToast] = useState<string | null>(null);
   const [freeMode, setFreeMode] = useState(false);
   const [freeRect, setFreeRect] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
-  const [maskTick, setMaskTick] = useState(0); // force re-compute on resize/scroll
+  const [maskTick, setMaskTick] = useState(0);
 
   const ctrlRef = useRef<VideoController | null>(null);
   const maxEngineRef = useRef<MaximizeEngine | null>(null);
-  // 当任一功能激活时锁定 target video，阻止 Bilibili / YouTube 这类
-  // 重建 <video> 节点的站点造成 target 抖动 → maximize 循环 → 闪动
   const lockTargetRef = useRef(false);
 
   const store = useMemo(() => createSettingsStore(), []);
@@ -46,7 +48,6 @@ export function App() {
     return () => detector.destroy();
   }, []);
 
-  // 同步 lockTargetRef
   useEffect(() => {
     lockTargetRef.current = maximized || maskOn || aspectRatio !== 'original';
   }, [maximized, maskOn, aspectRatio]);
@@ -59,7 +60,7 @@ export function App() {
       return;
     }
     const ctrl = new VideoController(video);
-    const engine = new MaximizeEngine(ctrl);
+    const engine = new MaximizeEngine(video, overlayContainer);
     ctrlRef.current = ctrl;
     maxEngineRef.current = engine;
     return () => {
@@ -68,7 +69,7 @@ export function App() {
       ctrlRef.current = null;
       maxEngineRef.current = null;
     };
-  }, [video]);
+  }, [video, overlayContainer]);
 
   // 加载 per-domain 设置
   useEffect(() => {
@@ -85,7 +86,7 @@ export function App() {
     });
   }, [store]);
 
-  // 应用 maximize / aspect — 统一通过同一个 ctrl/engine
+  // 应用 maximize / aspect
   useEffect(() => {
     const ctrl = ctrlRef.current;
     const engine = maxEngineRef.current;
@@ -95,20 +96,18 @@ export function App() {
 
     if (!anyActive) {
       if (engine.isMaximized()) engine.restore();
-      else if (ctrl.isAttached()) ctrl.detach();
+      if (ctrl.isAttached()) ctrl.detach();
       return;
     }
 
-    if (maximized) {
+    // Maximize state transitions
+    if (maximized && !engine.isMaximized()) {
       engine.maximize({ keepAspect: fitMode === 'letterbox' });
-    } else if (engine.isMaximized()) {
-      // dropping maximize but keeping aspect — undo position but keep attached
-      ctrl.detach();
-      ctrl.attach();
-    } else if (!ctrl.isAttached()) {
-      ctrl.attach();
+    } else if (!maximized && engine.isMaximized()) {
+      engine.restore();
     }
 
+    // Aspect routing: mirror if maximized, original otherwise
     if (hasAspect && video.videoWidth) {
       const out = AspectEngine.compute({
         sourceW: video.videoWidth,
@@ -116,31 +115,44 @@ export function App() {
         target: aspectRatio,
         mode: fitMode,
       });
-      // 当目标比例==源比例 且 stretch 模式时，AspectEngine 给出 scaleX=scaleY=1
-      // 直接 apply 会写一次 transform: scale(1,1) !important，触发站点 player 的
-      // ResizeObserver / MutationObserver → 闪动。完全 no-op 时跳过写入。
       const isNoOp =
         out.transform.scaleX === 1 &&
         out.transform.scaleY === 1 &&
         out.objectFit === 'fill';
-      if (!isNoOp || maximized) {
-        ctrl.applyTransform({
-          scaleX: out.transform.scaleX,
-          scaleY: out.transform.scaleY,
-          objectFit: out.objectFit,
-        });
+      if (engine.isMaximized()) {
+        if (!isNoOp) {
+          engine.applyAspectToMirror(out.transform.scaleX, out.transform.scaleY, out.objectFit);
+        }
+      } else {
+        if (!ctrl.isAttached()) ctrl.attach();
+        if (!isNoOp) {
+          ctrl.applyTransform({
+            scaleX: out.transform.scaleX,
+            scaleY: out.transform.scaleY,
+            objectFit: out.objectFit,
+          });
+        }
       }
+    } else if (ctrl.isAttached() && !maximized) {
+      ctrl.detach();
     }
-  }, [video, maximized, aspectRatio, fitMode]);
+  }, [video, maximized, aspectRatio, fitMode, overlayContainer]);
 
-  // freeRect 初始化
+  // freeRect 初始化 — now reads from the mirror
   useEffect(() => {
     if (!video || !maximized) {
       setFreeRect(null);
       return;
     }
-    const rect = video.getBoundingClientRect();
-    setFreeRect({ x: rect.left, y: rect.top, width: rect.width, height: rect.height });
+    const engine = maxEngineRef.current;
+    const mirror = engine?.getMirror();
+    if (!mirror) return;
+    // Defer to next tick so the mirror has been positioned
+    const id = setTimeout(() => {
+      const rect = mirror.getBoundingClientRect();
+      setFreeRect({ x: rect.left, y: rect.top, width: rect.width, height: rect.height });
+    }, 0);
+    return () => clearTimeout(id);
   }, [video, maximized]);
 
   // 持久化
@@ -167,10 +179,15 @@ export function App() {
     };
   }, [maskOn]);
 
-  // SPA 路由切换 — 重置当前 video 引用并触发恢复
+  // 当 maximized 切换时强制重算 mask clip-path（mirror rect vs original rect）
+  useEffect(() => {
+    if (!maskOn) return;
+    setMaskTick((n) => n + 1);
+  }, [maskOn, maximized]);
+
+  // SPA 路由切换
   useEffect(() => {
     const onNav = () => {
-      // 让 detector 重新扫描；状态留给 per-domain effect 重读
       setVideo(null);
       setMaximized(false);
       setMaskOn(false);
@@ -195,11 +212,13 @@ export function App() {
     };
   }, []);
 
-  // Mask clip-path
+  // Mask clip-path — uses mirror rect if maximized
   const maskClipPath = useMemo(() => {
     if (!maskOn || !video) return null;
-    void maskTick; // dependency
-    const rect = video.getBoundingClientRect();
+    void maskTick;
+    const engine = maxEngineRef.current;
+    const target = engine?.getMirror() ?? video;
+    const rect = target.getBoundingClientRect();
     return MaskEngine.computeClipPath(
       { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom },
       { width: window.innerWidth, height: window.innerHeight },
@@ -257,7 +276,6 @@ export function App() {
     else void video.requestFullscreen();
   }, [video]);
 
-  // Esc
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
@@ -269,7 +287,6 @@ export function App() {
     return () => document.removeEventListener('keydown', onKey);
   }, [maximized, maskOn, settingsOpen]);
 
-  // Command listener
   useEffect(() => {
     const listener = (msg: { type: string; command?: string }) => {
       if (msg.type !== 'command') return;

@@ -3,6 +3,8 @@ import tailwindCss from '@/styles/globals.css?inline';
 export interface MountResult {
   host: HTMLDivElement;
   shadowRoot: ShadowRoot;
+  /** Container for full-viewport overlays (e.g. the video mirror). Inside shadow root. */
+  overlayContainer: HTMLDivElement;
 }
 
 export function mountShadowRoot(): MountResult {
@@ -17,10 +19,17 @@ export function mountShadowRoot(): MountResult {
   style.textContent = tailwindCss;
   shadowRoot.appendChild(style);
 
+  // Container for full-viewport overlays (mirror, etc). Placed BEFORE react-mount so
+  // the React UI (toolbar, settings panel) renders on top of it.
+  const overlayContainer = document.createElement('div');
+  overlayContainer.id = 'overlay-container';
+  overlayContainer.style.pointerEvents = 'auto';
+  shadowRoot.appendChild(overlayContainer);
+
   const reactMount = document.createElement('div');
   reactMount.id = 'react-mount';
   reactMount.style.pointerEvents = 'auto';
   shadowRoot.appendChild(reactMount);
 
-  return { host, shadowRoot };
+  return { host, shadowRoot, overlayContainer };
 }

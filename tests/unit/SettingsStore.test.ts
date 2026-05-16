@@ -34,7 +34,7 @@ describe('SettingsStore', () => {
   it('returns existing domain settings merged with overrides', async () => {
     await store.getState().updateDomain('youtube.com', { lastMaximize: true, lastMaskOpacity: 0.6 });
     await store.getState().updateDomain('youtube.com', { lastMaximize: false });
-    const got = store.getState().domains['youtube.com'];
+    const got = store.getState().getDomain('youtube.com');
     expect(got.lastMaximize).toBe(false);
     expect(got.lastMaskOpacity).toBe(0.6);
   });
